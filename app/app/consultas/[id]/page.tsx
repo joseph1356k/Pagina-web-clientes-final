@@ -22,7 +22,11 @@ import {
 import { isDemoConsultation } from "@/lib/demo";
 import {
   adjustNoteWithAssistant,
+  describeAdjustmentOutcome,
+  getClinicalEncounter,
+  noteSectionLabels,
   saveEditedClinicalNote,
+  updateNoteSectionContent,
   friendlyClinicalMessage,
   ClinicalApiError,
 } from "@/lib/api/clinical";
@@ -283,8 +287,13 @@ export default function ConsultaDetallePage() {
   }
 
   // Edición asistida real: el backend calcula el ajuste sobre el encounter
-  // (mismo id que esta consulta, por el puente), lo persiste allí y aquí se
+  // (mismo id que esta consulta, por el puente), aquí se persiste allí y se
   // refleja en el historial local.
+  //
+  // La nota que se manda a ajustar es la que el médico VE: las ediciones a
+  // mano de esta pantalla solo viven en el espejo local (`updateNote`), el
+  // backend sigue con la última que le guardaron. Sin mandarla, la propuesta
+  // se calculaba sobre esa vieja y el PUT de abajo pisaba lo editado.
   async function aiEdit(instruction: string) {
     const texto = instruction.trim();
     if (!texto || aiEditing || !c) return;
@@ -294,9 +303,24 @@ export default function ConsultaDetallePage() {
       // La instrucción y la nota viajan con los datos reales; el servidor tapa
       // los identificadores del paciente antes de llamar a la IA y devuelve la
       // propuesta ya rehidratada (docs/privacidad-frontera-ia.md).
+      const encounter = await getClinicalEncounter(c.id);
+      let notaActual = encounter.note_json ?? null;
+      if (notaActual) {
+        for (const seccion of c.note) {
+          const contenido =
+            seccion.kind === "lista"
+              ? (seccion.items ?? []).join("\n")
+              : (seccion.texto ?? "");
+          notaActual = updateNoteSectionContent(notaActual, seccion.id, contenido);
+        }
+        if (c.resumen && c.resumen !== notaActual.summary) {
+          notaActual = { ...notaActual, summary: c.resumen };
+        }
+      }
       const proposal = await adjustNoteWithAssistant({
         encounter_id: c.id,
         instruction: texto,
+        note_json: notaActual ?? undefined,
         doctor: buildDoctorContext(userPreferences, firstName),
       });
       const saved = await saveEditedClinicalNote(c.id, proposal.proposed_note_json);
@@ -308,7 +332,22 @@ export default function ConsultaDetallePage() {
       });
       // Si el espejo no se pudo guardar, el store ya mostró la advertencia.
       if (mirror.ok) {
-        showToast("Nota ajustada por Miracle. Revisa los cambios.", "success");
+        const avisos = describeAdjustmentOutcome(
+          proposal,
+          noteSectionLabels(proposal.proposed_note_json),
+        );
+        const explicacion = proposal.explanation?.trim();
+        if (proposal.changed_sections.length) {
+          showToast(
+            explicacion
+              ? `Nota ajustada por Miracle. ${explicacion}`
+              : "Nota ajustada por Miracle. Revisa los cambios.",
+            "success",
+          );
+        } else {
+          showToast(explicacion || "Miracle no cambió la nota.", "info");
+        }
+        for (const aviso of avisos) showToast(aviso, "warning");
       }
     } catch (error) {
       if (
@@ -797,6 +836,9 @@ function HistoriaTab({
           <Sparkles size={16} className="text-accent" />
           <input
             name="ai"
+            // Sin esto el navegador ofrece como "recientes" todo lo que se
+            // haya escrito aquí, y parece una función de la app que no existe.
+            autoComplete="off"
             placeholder="Pídale a Miracle un ajuste de la nota…"
             disabled={aiBusy}
             maxLength={2000}
