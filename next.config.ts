@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
+import { redireccionesDelDominioViejo } from "./lib/dominio-viejo";
 
 const nextConfig: NextConfig = {
   // Fija la raíz del proyecto (hay un package-lock.json suelto en el home del
@@ -63,10 +64,16 @@ const nextConfig: NextConfig = {
       "recursos",
       "seguridad",
     ];
-    return retiradas.flatMap((r) => [
-      { source: `/${r}`, destination: "/", permanent: false },
-      { source: `/${r}/:ruta*`, destination: "/", permanent: false },
-    ]);
+    return [
+      // Primero: el portal se mudó a www.itsmiracleai.com. Quien llega por
+      // itsmiracleai.com.co se va allí, salvo las rutas de máquinas
+      // (lib/dominio-viejo.ts; corte en ZevCorp/Miracle docs/monorepo/corte-com-co.md).
+      ...redireccionesDelDominioViejo(),
+      ...retiradas.flatMap((r) => [
+        { source: `/${r}`, destination: "/", permanent: false },
+        { source: `/${r}/:ruta*`, destination: "/", permanent: false },
+      ]),
+    ];
   },
   async headers() {
     return [
