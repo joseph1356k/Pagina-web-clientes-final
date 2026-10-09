@@ -483,3 +483,24 @@ Reglas del contrato:
 - `sources` solo trae las guías que la respuesta usó de verdad; una referencia inventada por el modelo se descarta en Graph y se borra del texto.
 - `note_proposal` llega solo cuando el médico pidió cambiar la nota, `note_editable` no es `false` y de verdad cambió algo. `proposed_note_json` **no trae `discharge`** (el validador de Graph no lo conoce): la pantalla aplica `changed_sections` por clave sobre la nota actual, nunca reemplaza la nota entera. `previous_content` sirve para avisar si el médico editó esa sección entre la propuesta y el clic.
 - La propuesta nunca se persiste en Graph; se guarda con `PUT /encounters/:id/note` como cualquier edición.
+
+### v3 (2026-10-09): cifras verificadas y fichas técnicas
+
+Campos nuevos de la respuesta, también opcionales (la web los ignora si no llegan):
+
+```json
+{
+  "sources": [
+    { "ref": "G1", "kind": "guia", "guideline_id": "hipertension-arterial-adultos", "title": "...", "organism": "ESC", "year": 2024, "section": "Metas de presión arterial" },
+    { "ref": "F1", "kind": "ficha_tecnica", "guideline_id": "cima-60002", "title": "Ficha técnica: Amoxicilina 500 mg Cápsula", "organism": "AEMPS (España) · CIMA", "year": 2024, "section": "4.2 Posología y forma de administración", "url": "https://cima.aemps.es/cima/dochtml/ft/60002/FT_60002.html" }
+  ],
+  "figures_checked": 4,
+  "unverified_figures": ["35 mg/kg"],
+  "used_context": { "guidelines": 3, "drug_labels": 1 }
+}
+```
+
+- `kind`: `guia` (resumen del corpus curado de Graph, refs `G#`) o `ficha_tecnica` (extracto de la ficha técnica oficial española, refs `F#`). Sin `kind` = `guia`.
+- `url`: solo en fichas técnicas; la web únicamente enlaza URLs `https://`.
+- `unverified_figures`: cifras con unidad de la respuesta (dosis, intervalos, duraciones, umbrales, metas) que Graph **no encontró** en las guías y fichas recuperadas ni en la consulta (nota, transcripción, códigos, mensaje e historial). Es una advertencia, no un filtro: la pantalla las lista para que el médico las verifique. `figures_checked` dice cuántas se revisaron.
+- `support: "guia"` cubre guías y fichas; la pantalla dice cuál se citó.

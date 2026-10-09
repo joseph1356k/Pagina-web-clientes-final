@@ -7,9 +7,11 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
   FileEdit,
   Loader2,
   ShieldAlert,
+  Pill,
   X,
 } from "lucide-react";
 import type { AssistantSupport } from "@/lib/api/clinical";
@@ -76,7 +78,14 @@ export function AssistantTurnCard({
   onApply: () => void;
   onDiscard: () => void;
 }) {
-  const badge = data.support ? SUPPORT_BADGE[data.support] : null;
+  const hasLabel = data.sources.some((source) => source.kind === "ficha_tecnica");
+  const hasGuide = data.sources.some((source) => source.kind !== "ficha_tecnica");
+  const baseBadge = data.support ? SUPPORT_BADGE[data.support] : null;
+  // «guia» cubre guías y fichas técnicas: la etiqueta dice cuál se citó.
+  const badge =
+    baseBadge && data.support === "guia" && hasLabel
+      ? { ...baseBadge, label: hasGuide ? "Con guía y ficha técnica" : "Con ficha técnica oficial" }
+      : baseBadge;
   const abstained = data.support === "insuficiente";
   const proposal = data.proposal;
 
@@ -126,6 +135,24 @@ export function AssistantTurnCard({
         </div>
       ) : null}
 
+      {data.unverifiedFigures.length && !abstained ? (
+        <div role="note" className="rounded-[12px] border border-warning/40 bg-warning-soft px-3 py-2 text-warning">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide">
+            <AlertTriangle size={13} /> Cifras sin fuente recuperada
+          </p>
+          <p className="mt-1 text-[12px] leading-relaxed">
+            No aparecen en las guías ni en las fichas citadas, ni en la consulta. Verifícalas antes de usarlas.
+          </p>
+          <ul className="mt-1.5 flex flex-wrap gap-1.5">
+            {data.unverifiedFigures.map((figure) => (
+              <li key={figure} className="rounded-full border border-warning/40 bg-surface px-2 py-0.5 font-mono text-[11px]">
+                {figure}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       {data.sources.length ? (
         <div className="rounded-[12px] border border-line bg-surface px-3 py-2">
           <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
@@ -137,12 +164,32 @@ export function AssistantTurnCard({
                 <span className="mr-1.5 rounded bg-accent-soft px-1.5 py-0.5 font-mono text-[10px] font-semibold text-accent-ink">
                   {source.ref}
                 </span>
+                {source.kind === "ficha_tecnica" ? (
+                  <Pill size={12} className="mr-1 inline-block align-[-2px] text-muted" aria-hidden />
+                ) : null}
                 <span className="font-medium">{source.title}</span>
                 <span className="text-muted"> · {sourceLabel(source)}</span>
+                {source.url ? (
+                  <a
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-1.5 inline-flex items-center gap-0.5 font-semibold text-accent"
+                  >
+                    Ver ficha <ExternalLink size={11} aria-hidden />
+                  </a>
+                ) : null}
               </li>
             ))}
           </ul>
-          <p className="mt-1 text-[11px] text-muted">Resumen orientativo de cada guía; verifique en la fuente.</p>
+          {hasGuide ? (
+            <p className="mt-1 text-[11px] text-muted">Resumen orientativo de cada guía; verifique en la fuente.</p>
+          ) : null}
+          {hasLabel ? (
+            <p className="mt-1 text-[11px] text-muted">
+              Ficha técnica española (AEMPS); verifique la presentación registrada en el INVIMA.
+            </p>
+          ) : null}
         </div>
       ) : null}
 

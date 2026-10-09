@@ -19,8 +19,36 @@ describe("normalizeAssistantResult", () => {
       missing: [],
       alerts: [],
       followUps: [],
+      unverifiedFigures: [],
       proposal: null,
     });
+  });
+
+  it("cifras sin fuente y fichas técnicas: se conservan acotadas; solo enlaces https", () => {
+    const out = normalizeAssistantResult({
+      answer: "x",
+      mode: "clinical_chat",
+      support: "guia",
+      sources: [
+        { ref: "G1", guideline_id: "hta", title: "HTA" },
+        {
+          ref: "F1",
+          kind: "ficha_tecnica",
+          guideline_id: "cima-60002",
+          title: "Ficha técnica: Amoxicilina 500 mg Cápsula",
+          organism: "AEMPS (España) · CIMA",
+          section: "4.2 Posología y forma de administración",
+          url: "https://cima.aemps.es/cima/dochtml/ft/60002/FT_60002.html",
+        },
+        { ref: "F2", kind: "ficha_tecnica", guideline_id: "x", title: "X", url: "javascript:alert(1)" },
+      ],
+      figures_checked: 12,
+      unverified_figures: ["35 mg/kg", "35 mg/kg", "7 días", "1", "2", "3", "4", "5", "6", "7"],
+    });
+    expect(out.sources.map((source) => source.kind)).toEqual(["guia", "ficha_tecnica", "ficha_tecnica"]);
+    expect(out.sources[1].url).toBe("https://cima.aemps.es/cima/dochtml/ft/60002/FT_60002.html");
+    expect(out.sources[2].url).toBeUndefined();
+    expect(out.unverifiedFigures).toEqual(["35 mg/kg", "7 días", "1", "2", "3", "4", "5", "6"]);
   });
 
   it("respeta el enum de respaldo y acota las listas", () => {

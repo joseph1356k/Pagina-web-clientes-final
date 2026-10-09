@@ -975,13 +975,18 @@ export type AssistantSupport = "consulta" | "guia" | "general" | "insuficiente";
 
 /** Fragmento de guía clínica que el asistente citó de verdad ([G1], [G2]…). */
 export interface AssistantSource {
+  /** G1, G2… (guía del corpus) o F1, F2… (ficha técnica oficial). */
   ref: string;
+  /** Ausente en un Graph anterior: se trata como "guia". */
+  kind?: "guia" | "ficha_tecnica";
   guideline_id: string;
   title: string;
   organism?: string;
   year?: number | string;
   section?: string;
   source?: string;
+  /** Enlace público a la ficha técnica (solo fichas, https). */
+  url?: string;
 }
 
 /** Una sección que la propuesta cambia, con lo que había para detectar deriva. */
@@ -1020,6 +1025,7 @@ export interface AssistantChatResult {
     codes?: boolean;
     patient?: boolean;
     guidelines?: number;
+    drug_labels?: number;
     screen_context?: boolean;
   };
   safety_notice?: string;
@@ -1031,6 +1037,11 @@ export interface AssistantChatResult {
   alarm_signs?: string[];
   follow_up_questions?: string[];
   note_proposal?: AssistantNoteProposal | null;
+  // --- v3 (Graph con verificación de cifras y fichas técnicas). ---
+  /** Cuántas cifras con unidad (dosis, umbrales, duraciones) se verificaron. */
+  figures_checked?: number;
+  /** Cifras de la respuesta que no aparecen en las fuentes ni en la consulta. */
+  unverified_figures?: string[];
 }
 
 export async function sendAssistantChat(

@@ -302,3 +302,37 @@ campos nuevos del payload y esta web pinta como texto plano una respuesta sin
 los nuevos. Las preguntas de inicio dependen del contexto y la especialidad
 (`lib/assistant/starters.ts`). Lo que no viaja en v1: la transcripción sin
 guardar (el chat usa la persistida, que se autoguarda cada 2,5 s).
+
+## D23 · La confiabilidad del asistente se comprueba en Graph, no se le pide al modelo
+**Decisión (2026-10-09):** además de citar guías (D22), Graph verifica cada
+respuesta antes de devolverla y la pantalla muestra lo que no pudo verificar:
+- **Cifras:** toda dosis, intervalo, duración, umbral o meta con unidad que
+  escribe el modelo se busca en las guías y fichas recuperadas y en la consulta
+  (con equivalencias, 1 g = 1000 mg). Las que no aparecen llegan en
+  `unverified_figures` y la tarjeta «Cifras sin fuente recuperada» las lista.
+  Es una advertencia, no un filtro: que el número exista en la fuente no prueba
+  que se usó bien; que no exista sí obliga a mirar.
+- **Fichas técnicas oficiales:** para preguntas de dosis, contraindicaciones,
+  interacciones, embarazo o efectos adversos, Graph añade el extracto de la
+  sección correspondiente de la ficha técnica española (CIMA, AEMPS), citable
+  como `[F#]` con enlace. A CIMA solo sale el principio activo de un diccionario
+  cerrado; nunca texto de la consulta. Plazo corto, caché y cortacircuitos: si
+  CIMA no responde, el chat sigue con las guías.
+- **Búsqueda más lista sin más infraestructura:** la búsqueda léxica conoce la
+  población del paciente (niño, adulto, adulto mayor, gestante), hereda el tema
+  de la pregunta anterior en las de seguimiento («¿y en niños?»), tolera errores
+  de digitación y marca la relevancia de cada extracto. Una evaluación fija
+  (recall, MRR, preguntas fuera de tema, latencia) corre en `npm test` de Graph.
+**Por qué no una base vectorial ni un modelo «médico»:** con un corpus curado
+de decenas de guías, la búsqueda en memoria tarda milisegundos y no saca nada
+de Graph; una base vectorial añade latencia, costo y otro lugar por donde
+viajaría el texto. Las evaluaciones independientes de 2024–2026 no muestran
+ventaja de los modelos afinados en medicina frente a los generalistas de
+frontera, y los productos clínicos con contenido licenciado no ofrecen API
+abierta para Colombia. La calidad se gana con el modelo de frontera que se
+configura en Provider Studio, fuentes verificables y comprobación en código.
+**Consecuencia:** la ficha técnica es española: la pantalla lo dice y pide
+verificar la presentación registrada en el INVIMA. Si CIMA no es alcanzable
+desde el despliegue, `npm run check:cima` en Graph lo muestra y
+`npm run build:drug-labels` precarga las fichas desde una máquina con red.
+

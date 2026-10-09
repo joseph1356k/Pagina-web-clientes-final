@@ -19,6 +19,8 @@ export interface AssistantTurnData {
   missing: string[];
   alerts: string[];
   followUps: string[];
+  /** Cifras que Graph no encontró en las fuentes recuperadas ni en la consulta. */
+  unverifiedFigures: string[];
   proposal: AssistantNoteProposal | null;
 }
 
@@ -41,12 +43,15 @@ function normalizeSources(value: unknown): AssistantSource[] {
     .filter((item): item is AssistantSource => Boolean(item) && typeof item === "object" && typeof (item as AssistantSource).ref === "string")
     .map((item) => ({
       ref: item.ref,
+      kind: item.kind === "ficha_tecnica" ? ("ficha_tecnica" as const) : ("guia" as const),
       guideline_id: `${item.guideline_id ?? ""}`,
       title: `${item.title ?? ""}`.trim() || item.ref,
       organism: item.organism ? `${item.organism}` : undefined,
       year: item.year,
       section: item.section ? `${item.section}` : undefined,
       source: item.source ? `${item.source}` : undefined,
+      // Solo enlaces https: el texto viene del backend, pero un href es un href.
+      url: typeof item.url === "string" && /^https:\/\//.test(item.url) ? item.url : undefined,
     }));
 }
 
@@ -90,6 +95,7 @@ export function normalizeAssistantResult(raw: AssistantChatResult): AssistantTur
     missing: stringList(raw.missing_information, 6),
     alerts: stringList(raw.alarm_signs, 6),
     followUps: stringList(raw.follow_up_questions, 3),
+    unverifiedFigures: stringList(raw.unverified_figures, 8),
     proposal: normalizeProposal(raw.note_proposal),
   };
 }
