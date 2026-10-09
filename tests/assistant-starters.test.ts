@@ -27,6 +27,13 @@ describe("starterQuestions", () => {
     const psiquiatria = starterQuestions({ hasEncounter: false, hasNote: false, hasTranscript: false, specialtyCode: "psiquiatria" });
     expect(psiquiatria[0]).toMatch(/suicida/i);
 
+    const infecto = starterQuestions({ hasEncounter: false, hasNote: false, hasTranscript: false, specialtyCode: "infectologia" });
+    esUnicoYCompleto(infecto);
+    expect(infecto[0]).toMatch(/sífilis/i);
+
+    const urgencias = starterQuestions({ hasEncounter: false, hasNote: false, hasTranscript: false, specialtyCode: "urgencias" });
+    expect(urgencias[0]).toMatch(/anafilaxia/i);
+
     const desconocida = starterQuestions({ hasEncounter: false, hasNote: false, hasTranscript: false, specialtyCode: "odontologia" });
     expect(desconocida).toEqual(starterQuestions({ hasEncounter: false, hasNote: false, hasTranscript: false }));
   });

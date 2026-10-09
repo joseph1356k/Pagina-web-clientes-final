@@ -36,7 +36,7 @@ const GENERAL_BY_SPECIALTY: { match: RegExp; questions: string[] }[] = [
     match: /(ginecolog|obstetr)/,
     questions: [
       "Criterios diagnósticos de preeclampsia y signos de severidad",
-      "Antihipertensivos seguros en el embarazo y cuáles evitar",
+      "Hemorragia posparto: secuencia de uterotónicos y ácido tranexámico",
     ],
   },
   {
@@ -49,8 +49,8 @@ const GENERAL_BY_SPECIALTY: { match: RegExp; questions: string[] }[] = [
   {
     match: /urgencia/,
     questions: [
+      "Dosis de adrenalina intramuscular en anafilaxia en adultos y niños",
       "Criterios de sepsis y qSOFA: ¿cuándo activo el manejo inicial?",
-      "Dolor torácico en urgencias: ¿qué descarta un síndrome coronario agudo?",
     ],
   },
   {
@@ -68,10 +68,17 @@ const GENERAL_BY_SPECIALTY: { match: RegExp; questions: string[] }[] = [
     ],
   },
   {
-    match: /(neumolog|infectolog)/,
+    match: /neumolog/,
     questions: [
       "Clasificación GOLD de la EPOC y tratamiento inhalado por grupo",
       "¿Cuándo hospitalizar una neumonía adquirida en la comunidad (CURB-65)?",
+    ],
+  },
+  {
+    match: /infectolog/,
+    questions: [
+      "Sífilis gestacional: tratamiento el mismo día y seguimiento con VDRL",
+      "Profilaxis posexposición al VIH: ¿hasta cuántas horas y con qué esquema?",
     ],
   },
 ];
