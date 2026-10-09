@@ -427,3 +427,80 @@ El frontend muestra siempre estos módulos fuera de `note_json.sections`; así s
 Las notas privadas viven en `clinical_encounters.private_notes` y se actualizan con `PUT /api/clinical/encounters/:id/private-notes`. Son exclusivas del médico, no forman parte del contexto de IA y no se exportan por defecto.
 
 Para cambiar una plantilla se usa `POST /api/clinical/encounters/:id/regenerate-with-template` con `{ template_id }`. La respuesta entrega el encounter nuevo con `supersedes_encounter_id`; el original conserva su contenido y expone `replaced_by_encounter_id` para auditoría.
+
+## Asistente clínico v2 (2026-10-01)
+
+`POST /api/clinical/assistant/chat` (Bearer de Supabase). Tipos en `lib/api/clinical.ts`
+(`AssistantChatPayload`, `AssistantChatResult`). **Todos los campos nuevos son
+opcionales en los dos sentidos**: un Graph anterior ignora los del payload y la
+web pinta como texto plano una respuesta sin los de la respuesta.
+
+### Payload
+
+| Campo | Qué es | Topes (los pone la web, Graph vuelve a sanear) |
+|---|---|---|
+| `message`, `history`, `encounter_id`, `specialty`, `screen_context`, `doctor` | como hasta ahora | historial: últimos 12 turnos, 4000 chars c/u, solo el texto de la respuesta |
+| `note_json_draft` | la nota EN PANTALLA (`{summary?, sections:[{key,label,content}]}`); manda sobre la persistida | 8000 chars por sección, 20 000 en total; con `encounter_id`, Graph descarta keys fuera del snapshot |
+| `codes` | `[{sistema, codigo, descripcion, estado}]` aceptados o sugeridos | 20 códigos, 160 chars por descripción |
+| `patient_context` | `{edad?, sexo?: 'F'\|'M'}`; nunca nombre ni documento | — |
+| `note_editable` | `false` cuando la nota está firmada: el asistente explica y sugiere una adenda, no propone cambios | — |
+
+Si Graph responde `ENCOUNTER_NOT_FOUND` (consulta anterior al puente, o un
+supervisor que no es el dueño), la web reintenta **una vez** sin `encounter_id`
+conservando borrador y códigos, y recuerda ese encounter para no repetir el
+doble viaje (límite de 20 llamadas/min por IP en Graph).
+
+### Respuesta
+
+```json
+{
+  "answer": "texto plano con saltos de línea; cita [G1] cuando usa una guía",
+  "mode": "clinical_chat",
+  "specialty": "medicina_general",
+  "support": "consulta | guia | general | insuficiente",
+  "sources": [{ "ref": "G1", "guideline_id": "hta-adultos", "title": "Hipertensión arterial en adultos", "organism": "ESC", "year": 2024, "section": "Metas y tratamiento" }],
+  "missing_information": ["qué dato o fuente haría falta"],
+  "alarm_signs": ["signo de alarma pertinente"],
+  "follow_up_questions": ["hasta 3 preguntas cortas de seguimiento"],
+  "note_proposal": {
+    "proposed_note_json": { "summary": "...", "sections": [ ... ], "warnings": [], "missing_required_sections": [] },
+    "changed_sections": [{ "key": "plan", "label": "Plan", "content": "texto nuevo completo", "previous_content": "lo que había" }],
+    "summary": null,
+    "explanation": "qué cambió y qué no",
+    "requires_physician_review": true
+  },
+  "used_context": { "encounter": true, "transcript": true, "note_json": true, "note_draft": true, "codes": true, "patient": false, "guidelines": 3, "screen_context": false },
+  "privacy": { "...": "igual que hoy" },
+  "safety_notice": "Apoyo clínico para revisión médica. No reemplaza el criterio profesional.",
+  "suggested_actions": []
+}
+```
+
+Reglas del contrato:
+
+- `answer` sigue siendo un string: las rutas que solo leen `answer` (API pública, Provider Studio) no cambian.
+- `support: "insuficiente"` significa que el asistente **no encontró respaldo** para una cifra, dosis, umbral o conducta concreta y prefirió no inventarla. `missing_information` dice qué falta; nunca llega vacío en ese caso.
+- `sources` solo trae las guías que la respuesta usó de verdad; una referencia inventada por el modelo se descarta en Graph y se borra del texto.
+- `note_proposal` llega solo cuando el médico pidió cambiar la nota, `note_editable` no es `false` y de verdad cambió algo. `proposed_note_json` **no trae `discharge`** (el validador de Graph no lo conoce): la pantalla aplica `changed_sections` por clave sobre la nota actual, nunca reemplaza la nota entera. `previous_content` sirve para avisar si el médico editó esa sección entre la propuesta y el clic.
+- La propuesta nunca se persiste en Graph; se guarda con `PUT /encounters/:id/note` como cualquier edición.
+
+### v3 (2026-10-09): cifras verificadas y fichas técnicas
+
+Campos nuevos de la respuesta, también opcionales (la web los ignora si no llegan):
+
+```json
+{
+  "sources": [
+    { "ref": "G1", "kind": "guia", "guideline_id": "hipertension-arterial-adultos", "title": "...", "organism": "ESC", "year": 2024, "section": "Metas de presión arterial" },
+    { "ref": "F1", "kind": "ficha_tecnica", "guideline_id": "cima-60002", "title": "Ficha técnica: Amoxicilina 500 mg Cápsula", "organism": "AEMPS (España) · CIMA", "year": 2024, "section": "4.2 Posología y forma de administración", "url": "https://cima.aemps.es/cima/dochtml/ft/60002/FT_60002.html" }
+  ],
+  "figures_checked": 4,
+  "unverified_figures": ["35 mg/kg"],
+  "used_context": { "guidelines": 3, "drug_labels": 1 }
+}
+```
+
+- `kind`: `guia` (resumen del corpus curado de Graph, refs `G#`) o `ficha_tecnica` (extracto de la ficha técnica oficial española, refs `F#`). Sin `kind` = `guia`.
+- `url`: solo en fichas técnicas; la web únicamente enlaza URLs `https://`.
+- `unverified_figures`: cifras con unidad de la respuesta (dosis, intervalos, duraciones, umbrales, metas) que Graph **no encontró** en las guías y fichas recuperadas ni en la consulta (nota, transcripción, códigos, mensaje e historial). Es una advertencia, no un filtro: la pantalla las lista para que el médico las verifique. `figures_checked` dice cuántas se revisaron.
+- `support: "guia"` cubre guías y fichas; la pantalla dice cuál se citó.
