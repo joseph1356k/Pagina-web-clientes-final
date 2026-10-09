@@ -336,3 +336,21 @@ verificar la presentación registrada en el INVIMA. Si CIMA no es alcanzable
 desde el despliegue, `npm run check:cima` en Graph lo muestra y
 `npm run build:drug-labels` precarga las fichas desde una máquina con red.
 
+
+## D24 · La prueba E2E del asistente monta el chat real fuera de Next
+
+**Decisión:** `npm run test:e2e` (Playwright 1.56.1 con el Chromium del
+entorno) abre en el navegador el `MedicalChat` real empaquetado con Vite desde
+`e2e/harness`, con una consulta publicada en el contexto, y simula las
+respuestas de Graph interceptando `/api/clinical/assistant/chat`. Cubre la
+respuesta v1 en texto plano, la abstención, las fuentes de guía y de ficha
+técnica (con enlace), las cifras sin fuente y «Aplicar a la nota» (solo cambia
+la sección propuesta). También comprueba que el contexto viaja sin nombre ni
+documento.
+**Por qué así:** la app exige sesión de Supabase y un Graph vivo; levantar
+ambos en CI es lento y frágil. En la página de prueba, la sesión y la
+navegación son stubs (`e2e/harness/stubs`) y la API apunta al mismo origen, así
+que no hay red ni CORS. No se agrega ninguna ruta a la app.
+**Consecuencia:** la prueba no cubre el login ni las páginas de consulta; eso
+lo siguen cubriendo las pruebas de `lib/assistant` en `npm test`. Corre aparte
+de `npm test` porque necesita un navegador.
