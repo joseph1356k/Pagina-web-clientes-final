@@ -54,3 +54,8 @@ supabase/seed/
 graphify-out/20*/
 # cache regenerado en cada `graphify update`: aparecia modificado para siempre
 graphify-out/cache/
+
+# e2e (Playwright)
+/e2e/.dist/
+/test-results/
+/playwright-report/

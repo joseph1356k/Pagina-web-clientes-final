@@ -23,6 +23,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Salidas de la prueba E2E (bundle de Vite y reportes de Playwright).
+    "e2e/.dist/**",
+    "test-results/**",
+    "playwright-report/**",
   ]),
 ]);
 
